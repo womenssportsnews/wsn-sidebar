@@ -1,0 +1,173 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WSN Sidebar - Auto Scroll</title>
+  <link href="="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Roboto', sans-serif;
+      background: #2e1a47;
+      color: white;
+      width: 400px;
+      height: 800px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    #fixtures {
+      overflow: hidden;
+      flex-grow: 1;
+    }
+    .sport-section {
+      display: none;
+      padding-top: 10px;
+    }
+    .sport-header {
+      font-size: 24px;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .fixture {
+      background-color: white;
+      color: #2e1a47;
+      margin: 8px 20px;
+      padding: 10px;
+      border-radius: 10px;
+      font-size: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .fixture-text {
+      max-width: 75%;
+    }
+    .fixture span {
+      display: block;
+    }
+    .comp-logo {
+      width: 32px;
+      height: 32px;
+      object-fit: contain;
+      margin-left: 10px;
+    }
+    #clock {
+      font-size: 14px;
+      text-align: center;
+      padding: 10px 0;
+      border-top: 1px solid #444;
+    }
+  </style>
+</head>
+<body>
+  <div id="fixtures"></div>
+  <div id="clock">Loading time…</div>
+
+  <script>
+    const emojiMap = {
+      "Football": "⚽",
+      "Basketball": "🏀",
+      "Tennis": "🎾",
+      "Rugby": "🏉",
+      "Cricket": "🏏"
+    };
+
+    function parseDateUS(str) {
+      const [month, day, year] = str.split("/").map(Number);
+      return new Date(year, month - 1, day);
+    }
+
+    function formatShortDate(date) {
+      const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return `${days[date.getDay()]}–${String(date.getDate()).padStart(2, '0')}–${months[date.getMonth()]}`;
+    }
+
+    function updateClock() {
+      const now = new Date();
+      const dateStr = formatShortDate(now);
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      document.getElementById("clock").innerText = `🕒 ${dateStr}  ${timeStr}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function fetchFixtures() {
+      fetch("https://opensheet.elk.sh/1DjxNqX6K9i6ADtmdTCmsKfoZqDjvbfz-Vy3V2nSCq3o/MAIN%20FIXTURE%20LIST")
+        .then(res => res.json())
+        .then(rows => {
+          const now = new Date();
+          const in5Days = new Date();
+          in5Days.setDate(now.getDate() + 5);
+
+          const grouped = {};
+
+          rows.forEach(row => {
+            const dateStr = row["Date"];
+            const time = row["Time"];
+            const match = row["Match"];
+            const competition = row["Competition"];
+            const sport = row["Sport"];
+            const logo = row["Logo"];
+
+            if (!dateStr || !match || !sport) return;
+            const date = parseDateUS(dateStr);
+            if (isNaN(date) || date < now || date > in5Days) return;
+
+            if (!grouped[sport]) grouped[sport] = [];
+            grouped[sport].push({ date, dateStr, time, match, competition, logo });
+          });
+
+          const container = document.getElementById("fixtures");
+          container.innerHTML = "";
+
+          Object.keys(grouped).forEach(sport => {
+            const section = document.createElement("div");
+            section.className = "sport-section";
+
+            const header = document.createElement("div");
+            header.className = "sport-header";
+            header.innerText = (emojiMap[sport] || "🎽") + " " + sport;
+            section.appendChild(header);
+
+            grouped[sport].sort((a, b) => a.date - b.date).forEach((fixture, i) => {
+              const div = document.createElement("div");
+              div.className = "fixture";
+              div.innerHTML = `
+                <div class="fixture-text">
+                  <span><strong>${formatShortDate(fixture.date)} ${fixture.time}</strong></span>
+                  <span>${fixture.match}</span>
+                  <span style="font-size: 12px;">${fixture.competition}</span>
+                </div>
+                <img src="${fixture.logo}" class="comp-logo" alt="logo">
+              `;
+              section.appendChild(div);
+            });
+
+            container.appendChild(section);
+          });
+
+          const sections = document.querySelectorAll(".sport-section");
+          let index = 0;
+          if (sections.length > 0) {
+            sections.forEach(s => (s.style.display = "none"));
+            sections[0].style.display = "block";
+
+            setInterval(() => {
+              sections[index].style.display = "none";
+              index = (index + 1) % sections.length;
+              sections[index].style.display = "block";
+            }, 10000);
+          }
+        });
+    }
+
+    fetchFixtures();
+    setInterval(fetchFixtures, 120000);
+  </script>
+</body>
+</html>
